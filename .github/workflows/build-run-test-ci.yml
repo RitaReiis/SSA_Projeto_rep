@@ -1,0 +1,46 @@
+name: Docker Compose CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-run-setup-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build and start services using Docker Compose
+        run: |
+          docker compose up -d --build
+
+      - name: List running containers
+        run: docker ps -a  # List all running containers to check their names
+
+      - name: Wait for services to be ready
+        run: sleep 10  # Adjust sleep time based on your services’ startup time
+
+      - name: Run database setup script (schema.sql)
+        run: |
+          docker exec isctespot-server-1 python /app/db/setup/create_db.py  # Replace with actual container name from 'docker ps'
+
+      - name: Run data population script (data_population.py)
+        run: |
+          docker exec isctespot-server-1 python /app/db/setup/data_population.py  # Replace with actual container name
+
+      - name: Run health check on frontend
+        run: |
+          curl -f http://localhost:5173/admin-one-vue-tailwind/#/ || exit 1
+
+      - name: Run health check on backend
+        run: |
+          docker exec isctespot-server-1 python /app/tests/health_checks/test_flow_1.py  # Replace with actual container name

@@ -1,0 +1,292 @@
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import axios from 'axios'
+
+// Helper function to decode JWT token
+function decodeJWT(token) {
+  try {
+    const parts = token.split('.');
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return payload;
+  } catch (e) {
+    return null;
+  }
+}
+
+export const useMainStore = defineStore('main', () => {
+  const userName = ref(localStorage.getItem('username'))
+  const userEmail = ref('doe.doe.doe@example.com')
+  const userAvatar = computed(
+    () =>
+      `https://api.dicebear.com/7.x/avataaars/svg?seed=${userEmail.value.replace(
+        /[^a-z0-9]+/gi,
+        '-'
+      )}`
+  )
+
+  const isFieldFocusRegistered = ref(false)
+  const clients = ref([])
+  const history = ref([])
+  const sales = ref([])
+  const _clients = ref([])
+  const _employees = ref([])
+  const products = ref([])
+  const totalRevenue = ref([])
+  const cashFlow = ref([])
+  const last3Sales = ref([])
+  const tickets = ref([])
+  // const userName = ref()
+
+  function setUser(payload) {
+    if (payload.name) {
+      userName.value = payload.name
+    }
+    if (payload.email) {
+      userEmail.value = payload.email
+    }
+  }
+
+  // Get user info from JWT token
+  function getUserFromJWT() {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+    
+    const payload = decodeJWT(token);
+    if (!payload) return null;
+    
+    return {
+      userId: payload.user_id,
+      compId: payload.comp_id,
+      isAdmin: payload.is_admin,
+      username: localStorage.getItem('username')
+    };
+  }
+
+  // Check if current user is admin
+  function isCurrentUserAdmin() {
+    const userInfo = getUserFromJWT();
+    return userInfo ? userInfo.isAdmin : false;
+  }
+
+  function fetchSampleClients() {
+    axios
+      .get(`data-sources/clients.json?v=3`)
+      .then((result) => {
+        clients.value = result?.data?.data
+      })
+      .catch((error) => {
+        alert(error.message)
+      })
+  }
+
+  function fetchSampleHistory() {
+    axios
+      .get(`data-sources/history.json`)
+      .then((result) => {
+        history.value = result?.data?.data
+      })
+      .catch((error) => {
+        alert(error.message)
+      })
+  }
+
+  function getUserInfo() {
+    const url = "http://localhost:5000/user/overview"
+    const userOverviewPayload = {
+      user_id: Number(localStorage.getItem('userId')),
+      token: localStorage.getItem('token'),
+    };
+    axios
+      .post(url, userOverviewPayload)
+      .then((r) => {
+        this.sales = r.data.sales
+        this.last3Sales = r.data.last_3_sales
+      })
+      .catch((error) => {
+        alert(error.message);
+    });
+  }
+
+  function getAdminOverview() {
+    const url = "http://localhost:5000/analytics"
+    const adminOverviewPayload = {
+      user_id: Number(localStorage.getItem('userId')),
+      token: localStorage.getItem('token'),
+      comp_id: Number(localStorage.getItem('companyId'))
+    };
+    axios
+      .post(url, adminOverviewPayload)
+      .then((r) => {
+        this.sales = r.data.sales
+        this.totalRevenue = r.data.revenue
+        this.last3Sales = r.data.last_3_sales
+      })
+      .catch((error) => {
+        alert(error.message);
+    });
+  }
+
+  function getClients() {
+    const url = "http://localhost:5000/clients"
+    const clientsPayload = {
+      user_id: Number(localStorage.getItem('userId')),
+      token: localStorage.getItem('token')
+    };
+    axios
+      .post(url, clientsPayload)
+      .then((r) => {
+        this._clients = r.data.clients
+      })
+      .catch((error) => {
+        alert(error.message);
+    });
+  }
+
+  function getTickets() {
+    const url = "http://localhost:5000/support/tickets"
+    const ticketsPayload = {
+      user_id: Number(localStorage.getItem('userId')),
+      token: localStorage.getItem('token'),
+      company_id: localStorage.getItem('companyId')
+    };
+    axios
+      .post(url, ticketsPayload)
+      .then((r) => {
+        this.tickets = r.data.tickets
+      })
+      .catch((error) => {
+        alert(error.message);
+    });
+  }
+
+  function getCompanyEmployees() {
+    const url = "http://localhost:5000/employees"
+    const employeesPayload = {
+      user_id: localStorage.getItem('userId'),
+      token: localStorage.getItem('token'),
+      comp_id: localStorage.getItem('companyId')
+    };
+    axios
+      .post(url, employeesPayload)
+      .then((r) => {
+        this._employees = r.data.employees
+      })
+      .catch((error) => {
+        alert(error.message);
+    });
+  }
+
+  function getCompanyProducts() {
+    const url = "http://localhost:5000/products"
+    const productsPayload = {
+      user_id: localStorage.getItem('userId'),
+      token: localStorage.getItem('token'),
+      comp_id: localStorage.getItem('companyId')
+    };
+    axios
+      .post(url, productsPayload)
+      .then((r) => {
+        this.products = r.data.products
+      })
+      .catch((error) => {
+        alert(error.message);
+    });
+  }
+
+  function getCompanyCashFlow() {
+    const url = "http://localhost:5000/cash-flow"
+    const cashFlowPayload = {
+      country_code: 'PT',
+      token: localStorage.getItem('token'),
+      comp_id: localStorage.getItem('companyId')
+    };
+    axios
+      .post(url, cashFlowPayload)
+      .then((r) => {
+        this.cashFlow = r.data
+      })
+      .catch((error) => {
+        alert(error.message);
+    });
+
+  }
+
+  function deleteEmployee(employee_id){
+    const url = "http://localhost:5000/employee/delete"
+    const employeesPayload = {
+      user_id: localStorage.getItem('userId'),
+      token: localStorage.getItem('token'),
+      employee_id: employee_id
+    };
+    axios
+      .post(url, employeesPayload)
+      .then((r) => {
+        alert('Seller deleted');
+      })
+      .catch((error) => {
+        alert(error.message);
+    });
+  }
+
+  function editCommission(sellerId, newCommission){
+    console.log(sellerId)
+    console.log('fodass')
+    const url = "http://localhost:5000/seller/update-commission"
+    const newComissionPayload = {
+      user_id: localStorage.getItem('userId'),
+      token: localStorage.getItem('token'),
+      seller_id: sellerId,
+      new_commission: newCommission
+    };
+    axios
+      .post(url, newComissionPayload)
+      .then((r) => {
+        alert('Commission edited');
+      })
+      .catch((error) => {
+        alert(error.message);
+    });
+  }
+
+  function calculateSalesRevenue() {
+    let totalRevenue = 0;
+    // Iterate through each sale and calculate revenue
+    this.sales.forEach((sale) => {
+      const revenue = sale.SellingPrice * sale.Quantity;
+      totalRevenue += revenue;
+    });
+  
+    this.totalRevenue = totalRevenue;
+  }
+
+  return {
+    userName,
+    userEmail,
+    userAvatar,
+    isFieldFocusRegistered,
+    clients,
+    history,
+    sales,
+    _clients,
+    _employees,
+    products,
+    tickets,
+    totalRevenue,
+    cashFlow,
+    setUser,
+    fetchSampleClients,
+    fetchSampleHistory,
+    getUserInfo,
+    getAdminOverview,
+    getClients,
+    getCompanyEmployees,
+    getCompanyProducts,
+    getCompanyCashFlow,
+    getTickets,
+    deleteEmployee,
+    editCommission,
+    calculateSalesRevenue,
+    getUserFromJWT,
+    isCurrentUserAdmin
+  }
+})
